@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Maaş Gözlem TR | Barış Öğretmen</title>
+    <meta name="description" content="Tüm Türkiye Rehabilitasyon ve Özel Eğitim sektörü canlı maaş veritabanı.">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { 
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' },
+                        dark: { 800: '#1e293b', 900: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
+        .glass-header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid #e5e7eb; }
+        .stat-card { transition: all 0.2s ease; }
+        .stat-card:active { transform: scale(0.98); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .loader-overlay { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
+        
+        /* Tab Geçiş Animasyonları */
+        .tab-content { display: none; animation: fadeIn 0.3s ease-out; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Haber Bandı Animasyonu */
+        .marquee-container { overflow: hidden; white-space: nowrap; position: relative; }
+        .marquee-content { display: inline-block; animation: marquee 45s linear infinite; padding-left: 100%; }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+        /* Admin Split Layout */
+        .admin-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; height: 100%; overflow: hidden; }
+        @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; overflow-y: auto; } .admin-sidebar { display: none; } }
+        .pop-in { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col min-h-screen">
+
+    <div id="app-loader" class="loader-overlay">
+        <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <h2 class="text-xl font-bold text-slate-800">Sisteme Bağlanılıyor...</h2>
+        <p class="text-sm text-slate-500 mt-2 text-center">Türkiye geneli veritabanı yükleniyor.</p>
+        
+        <div id="error-container" class="hidden mt-6 bg-red-50 border border-red-200 p-4 rounded-xl max-w-sm w-full text-center">
+            <div class="text-red-500 text-3xl mb-2"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h3 class="font-bold text-red-700 mb-1" id="error-title">Bağlantı Hatası</h3>
+            <p class="text-xs text-red-600 mb-3" id="error-desc">Veritabanına erişilemedi.</p>
+            <button onclick="location.reload()" class="bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold w-full">Tekrar Dene</button>
+        </div>
+    </div>
+
+    <div class="bg-indigo-900 text-white text-xs py-2 font-medium relative z-40 border-b border-indigo-800 overflow-hidden">
+        <div class="marquee-container">
+            <div id="marquee-text" class="marquee-content">
+                Maaş Gözlem Platformu (Tüm Türkiye) Yükleniyor...
+            </div>
+        </div>
+    </div>
+
+    <header class="glass-header sticky top-0 z-30">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3" onclick="location.reload()">
+                <div class="bg-blue-600 text-white p-2 rounded-lg shadow-lg shadow-blue-200">
+                    <i class="fa-solid fa-map-location-dot text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-slate-800">Maaş Gözlem TR</h1>
+                    <p class="text-[10px] font-semibold text-blue-600 tracking-wider uppercase">Barış Öğretmen</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <div class="hidden md:flex flex-col items-end mr-4">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase">Toplam Kayıt</span>
+                    <span id="header-total-count" class="text-lg font-bold text-slate-800 leading-none">0</span>
+                </div>
+                <button onclick="toggleAdminPanel()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition flex items-center justify-center">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-6 max-w-6xl">
+
+        <div class="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 mb-6 max-w-md mx-auto">
+            <button onclick="switchTab('entry')" id="tab-btn-entry" class="flex-1 py-2.5 text-sm font-bold rounded-lg transition-all text-white bg-blue-600 shadow-sm flex items-center justify-center gap-2">
+                <i class="fa-solid fa-plus-circle"></i> Veri Gir
+            </button>
+            <button onclick="switchTab('explore')" id="tab-btn-explore" class="flex-1 py-2.5 text-sm font-bold rounded-lg transition-all text-slate-500 hover:bg-slate-50 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-search"></i> Verileri İncele
+            </button>
+        </div>
+
+        <div id="tab-entry" class="tab-content active max-w-lg mx-auto">
+            <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-50 rounded-full blur-3xl"></div>
+                <h2 class="text-xl font-bold text-slate-800 mb-1 relative z-10">Maaşını Paylaş</h2>
+                <p class="text-sm text-slate-500 mb-6 relative z-10">Veriler %100 anonimdir. Türkiye geneli havuza eklenir.</p>
+
+                <form id="salaryForm" class="space-y-4 relative z-10">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Yıl</label>
+                            <select id="entry-year" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 font-semibold outline-none transition">
+                                <option value="2026">2026</option>
+                                <option value="2025" selected>2025</option>
+                                <option value="2024">2024</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Rumuz</label>
+                            <input type="text" id="entry-nick" maxlength="12" placeholder="Örn: Mavi" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Branş</label>
+                        <select id="entry-role" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition" required>
+                            <option value="" disabled selected>Branş Seçiniz...</option>
+                            <optgroup label="Eğitim">
+                                <option value="Uzman Öğretici (Okul Öncesi)">Uzman Öğretici (Okul Öncesi)</option>
+                                <option value="Uzman Öğretici (Çocuk Gelişimi)">Uzman Öğretici (Çocuk Gelişimi)</option>
+                                <option value="Uzman Öğretici (Sınıf Öğrt.)">Uzman Öğretici (Sınıf Öğrt.)</option>
+                                <option value="Özel Eğitim Öğretmeni">Özel Eğitim Öğretmeni</option>
+                            </optgroup>
+                            <optgroup label="Rehberlik">
+                                <option value="Psikolog">Psikolog</option>
+                                <option value="PDR / Psikolojik Danışman">PDR / Psikolojik Danışman</option>
+                                <option value="Rehber Öğretmen">Rehber Öğretmen</option>
+                            </optgroup>
+                            <optgroup label="Sağlık">
+                                <option value="Fizyoterapist">Fizyoterapist</option>
+                                <option value="Dil ve Konuşma Terapisti">Dil ve Konuşma Terapisti</option>
+                                <option value="Ergoterapist">Ergoterapist</option>
+                                <option value="Odyolog">Odyolog</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- İL / İLÇE SEÇİMİ -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">İl</label>
+                            <select id="entry-city" onchange="updateDistricts('entry')" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition" required>
+                                <option value="" disabled selected>İl Seç...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">İlçe</label>
+                            <select id="entry-district" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition" disabled required>
+                                <option value="" disabled selected>Önce İl Seçin</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Deneyim</label>
+                        <select id="entry-exp" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition" required>
+                            <option value="0.5">0-6 Ay</option>
+                            <option value="1">1 Yıl</option>
+                            <option value="2">2 Yıl</option>
+                            <option value="3">3 Yıl</option>
+                            <option value="4">4 Yıl</option>
+                            <option value="5">5 Yıl</option>
+                            <option value="6">6-9 Yıl</option>
+                            <option value="10">10+ Yıl</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Net Maaş (TL)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-slate-400 font-bold">₺</span>
+                            </div>
+                            <input type="number" id="entry-salary" placeholder="Örn: 35000" class="w-full pl-8 bg-white border-2 border-slate-200 text-slate-900 text-lg font-bold rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 outline-none transition" required>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1">* Asgari ücret altı girişler sisteme kaydedilmez.</p>
+                    </div>
+
+                    <button type="submit" id="submit-btn" class="w-full text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-bold rounded-xl text-sm px-5 py-4 text-center transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 mt-2">
+                        <span>Havuza Gönder</span>
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+            
+            <div class="mt-6">
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-3 ml-1">Son Eklenenler</h3>
+                <div id="mini-feed" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <div id="tab-explore" class="tab-content">
+            
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
+                <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-filter text-blue-500"></i> Filtreleme Seçenekleri
+                </h3>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <select id="filter-year" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg p-2.5 font-bold outline-none">
+                        <option value="all">Tüm Yıllar</option>
+                        <option value="2025" selected>2025</option>
+                        <option value="2024">2024</option>
+                    </select>
+                    <select id="filter-role" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg p-2.5 outline-none">
+                        <option value="all">Tüm Branşlar</option>
+                    </select>
+                    <!-- FİLTRELEME İL / İLÇE -->
+                    <select id="filter-city" onchange="updateDistricts('filter'); applyFilters()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg p-2.5 outline-none">
+                        <option value="all">Tüm İller</option>
+                    </select>
+                    <select id="filter-district" onchange="applyFilters()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-lg p-2.5 outline-none" disabled>
+                        <option value="all">Önce İl Seçin</option>
+                    </select>
+
+                    <button onclick="resetFilters()" class="col-span-2 md:col-span-1 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-lg p-2.5 transition">
+                        Filtreleri Temizle
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase">Veri Sayısı</p>
+                    <h4 id="stat-count" class="text-2xl font-black text-slate-800">0</h4>
+                </div>
+                <div class="bg-blue-600 p-4 rounded-xl shadow-lg shadow-blue-200 text-white">
+                    <p class="text-[10px] text-blue-100 font-bold uppercase">Ortalama Maaş</p>
+                    <h4 id="stat-avg" class="text-2xl font-black">0 ₺</h4>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase">En Düşük</p>
+                    <h4 id="stat-min" class="text-2xl font-black text-red-500">0 ₺</h4>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase">En Yüksek</p>
+                    <h4 id="stat-max" class="text-2xl font-black text-emerald-500">0 ₺</h4>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-700 text-xs mb-4">Deneyim Bazlı Ortalama</h3>
+                    <div class="h-64"><canvas id="chartExp"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-700 text-xs mb-4">En Yüksek Ortalamaya Sahip 5 İlçe (Seçili İl veya Genel)</h3>
+                    <div class="h-64"><canvas id="chartDistrict"></canvas></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-700 text-xs">Detaylı Liste</h3>
+                    <span class="text-[10px] text-slate-400 bg-white border border-slate-200 px-2 py-1 rounded">Son 100 Kayıt</span>
+                </div>
+                <div class="overflow-x-auto max-h-96 custom-scroll">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-400 font-bold uppercase sticky top-0 z-10">
+                            <tr>
+                                <th class="px-4 py-3">Rumuz</th>
+                                <th class="px-4 py-3">Branş</th>
+                                <th class="px-4 py-3">Konum</th>
+                                <th class="px-4 py-3">Tecrübe</th>
+                                <th class="px-4 py-3 text-right">Maaş</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="mt-auto py-8 text-center bg-white border-t border-slate-100">
+        <div class="container mx-auto px-4">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-3 tracking-widest">Öğretmen Çalışmaları</h4>
+            <div id="footer-links-container" class="flex flex-wrap justify-center gap-3 mb-6">
+            </div>
+            
+            <p class="font-bold text-slate-600 text-xs mb-1">Maaş Gözlem TR v2.0</p>
+            <p class="text-slate-400 text-[10px] font-medium">Barış Öğretmen | %100 Anonim Veri Ağı</p>
+        </div>
+    </footer>
+
+    <div id="admin-modal" class="fixed inset-0 bg-slate-900/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="bg-white rounded-[2rem] p-6 w-full max-w-5xl shadow-2xl h-[85vh] flex flex-col relative overflow-hidden">
+            <button onclick="toggleAdminPanel()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600 z-10"><i class="fa-solid fa-circle-xmark text-2xl"></i></button>
+            
+            <div id="admin-login-view" class="h-full flex flex-col items-center justify-center">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-lg"><i class="fa-solid fa-lock"></i></div>
+                <h3 class="text-xl font-bold mb-4 text-slate-800">Yönetici Paneli</h3>
+                <input type="email" id="admin-email" placeholder="E-posta" class="border-2 border-slate-200 p-3 rounded-xl mb-2 w-64 outline-none focus:border-blue-500 font-bold text-center">
+                <input type="password" id="admin-pass" placeholder="Şifre" class="border-2 border-slate-200 p-3 rounded-xl mb-4 w-64 outline-none focus:border-blue-500 font-bold text-center">
+                <button onclick="adminLogin()" class="bg-slate-800 text-white px-12 py-3 rounded-xl font-bold hover:bg-slate-700 transition shadow-lg">Giriş Yap</button>
+                <div id="admin-msg" class="text-red-500 text-sm mt-3 font-bold hidden"></div>
+            </div>
+            
+            <div id="admin-controls-view" class="hidden h-full flex flex-col">
+                <div class="flex items-center gap-3 mb-6 border-b pb-4">
+                    <div class="w-10 h-10 bg-slate-800 text-white rounded-xl flex items-center justify-center text-lg"><i class="fa-solid fa-user-tie"></i></div>
+                    <div><h3 class="font-bold text-lg text-slate-800">Yönetim Merkezi</h3><p class="text-xs text-slate-500">Sistem ayarları ve veri yönetimi.</p></div>
+                    <button onclick="logoutAdmin()" class="ml-auto bg-slate-100 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-200">Çıkış</button>
+                </div>
+
+                <div class="admin-grid">
+                    <div class="overflow-y-auto pr-2 space-y-4 custom-scroll">
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h4 class="font-bold text-blue-700 text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-comment-dots"></i> Pop-up Duyuru</h4>
+                            <textarea id="admin-input-popup" class="w-full p-3 rounded-lg border border-slate-300 text-xs mb-2 outline-none" rows="2" placeholder="Sisteme giren herkese görünecek mesaj..."></textarea>
+                            <button onclick="saveConfig('popup')" class="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">Yayınla</button>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h4 class="font-bold text-orange-600 text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-scroll"></i> Haber Bandı</h4>
+                            <input type="text" id="admin-input-news" class="w-full p-3 rounded-lg border border-slate-300 text-xs mb-2 outline-none" placeholder="Üstte kayan yazı...">
+                            <button onclick="saveConfig('news')" class="w-full bg-orange-500 text-white py-2 rounded-lg text-xs font-bold hover:bg-orange-600">Güncelle</button>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h4 class="font-bold text-green-600 text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-link"></i> Yeni Çalışma Linki</h4>
+                            <div class="space-y-2 mb-2">
+                                <input type="text" id="admin-link-title" class="w-full p-3 rounded-lg border border-slate-300 text-xs outline-none" placeholder="Başlık (Örn: Hafıza Oyunu)">
+                                <input type="text" id="admin-link-url" class="w-full p-3 rounded-lg border border-slate-300 text-xs outline-none" placeholder="URL (https://...)">
+                            </div>
+                            <button onclick="addFooterLink()" class="w-full bg-green-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-green-700">Footer'a Ekle</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-inner h-full">
+                        <div class="p-3 bg-slate-100 border-b flex justify-between items-center text-xs font-bold text-slate-600">
+                            <span>Kayıtlı Maaşlar</span>
+                            <span id="admin-record-count" class="bg-white px-2 py-0.5 rounded shadow-sm text-slate-800">0</span>
+                        </div>
+                        <div id="admin-records-list" class="flex-1 overflow-y-auto p-2 space-y-2 custom-scroll bg-slate-50">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="user-announcement-modal" class="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2rem] p-8 w-full max-w-sm text-center shadow-2xl pop-in relative border-4 border-blue-600">
+            <button onclick="document.getElementById('user-announcement-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 animate-bounce"><i class="fa-solid fa-bell"></i></div>
+            <h3 class="text-xl font-black text-slate-800 mb-3">DUYURU</h3>
+            <p id="user-popup-content" class="text-slate-600 mb-8 font-medium text-sm leading-relaxed">...</p>
+            <button onclick="document.getElementById('user-announcement-modal').classList.add('hidden')" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200">Tamam, Okudum</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- VERİ SABİTLERİ ---
+        const MIN_WAGE = { '2024': 17002, '2025': 22104, '2026': 28000 };
+        
+        // ŞEHİR VE İLÇE VERİTABANI
+        const TURKEY_DATA = {
+            "Adana": ["Aladağ","Ceyhan","Çukurova","Feke","İmamoğlu","Karaisalı","Karataş","Kozan","Pozantı","Saimbeyli","Sarıçam","Seyhan","Tufanbeyli","Yumurtalık","Yüreğir"],
+            "Adıyaman": ["Besni","Çelikhan","Gerger","Gölbaşı","Kahta","Merkez","Samsat","Sincik","Tut"],
+            "Afyonkarahisar": ["Başmakçı","Bayat","Bolvadin","Çay","Çobanlar","Dazkırı","Dinar","Emirdağ","Evciler","Hocalar","İhsaniye","İscehisar","Kızılören","Merkez","Sandıklı","Sinanpaşa","Sultandağı","Şuhut"],
+            "Ağrı": ["Diyadin","Doğubayazıt","Eleşkirt","Hamur","Merkez","Patnos","Taşlıçay","Tutak"],
+            "Aksaray": ["Ağaçören","Eskil","Gülağaç","Güzelyurt","Merkez","Ortaköy","Sarıyahşi","Sultanhanı"],
+            "Amasya": ["Göynücek","Gümüşhacıköy","Hamamözü","Merkez","Merzifon","Suluova","Taşova"],
+            "Ankara": ["Akyurt","Altındağ","Ayaş","Bala","Beypazarı","Çamlıdere","Çankaya","Çubuk","Elmadağ","Etimesgut","Evren","Gölbaşı","Güdül","Haymana","Kalecik","Kahramankazan","Keçiören","Kızılcahamam","Mamak","Nallıhan","Polatlı","Pursaklar","Sincan","Şereflikoçhisar","Yenimahalle"],
+            "Antalya": ["Akseki","Aksu","Alanya","Demre","Döşemealtı","Elmalı","Finike","Gazipaşa","Gündoğmuş","İbradı","Kaş","Kemer","Kepez","Konyaaltı","Korkuteli","Kumluca","Manavgat","Muratpaşa","Serik"],
+            "Ardahan": ["Çıldır","Damal","Göle","Hanak","Merkez","Posof"],
+            "Artvin": ["Ardanuç","Arhavi","Borçka","Hopa","Kemalpaşa","Merkez","Murgul","Şavşat","Yusufeli"],
+            "Aydın": ["Bozdoğan","Buharkent","Çine","Didim","Efeler","Germencik","İncirliova","Karacasu","Karpuzlu","Koçarlı","Köşk","Kuşadası","Kuyucak","Nazilli","Söke","Sultanhisar","Yenipazar"],
+            "Balıkesir": ["Altıeylül","Ayvalık","Balya","Bandırma","Bigadiç","Burhaniye","Dursunbey","Edremit","Erdek","Gömeç","Gönen","Havran","İvrindi","Karesi","Kepsut","Manyas","Marmara","Savaştepe","Sındırgı","Susurluk"],
+            "Bartın": ["Amasra","Kurucaşile","Merkez","Ulus"],
+            "Batman": ["Beşiri","Gercüş","Hasankeyf","Kozluk","Merkez","Sason"],
+            "Bayburt": ["Aydıntepe","Demirözü","Merkez"],
+            "Bilecik": ["Bozüyük","Gölpazarı","İnhisar","Merkez","Osmaneli","Pazaryeri","Söğüt","Yenipazar"],
+            "Bingöl": ["Adaklı","Genç","Karlıova","Kiğı","Merkez","Solhan","Yayladere","Yedisu"],
+            "Bitlis": ["Adilcevaz","Ahlat","Güroymak","Hizan","Merkez","Mutki","Tatvan"],
+            "Bolu": ["Dörtdivan","Gerede","Göynük","Kıbrıscık","Mengen","Merkez","Mudurnu","Seben","Yeniçağa"],
+            "Burdur": ["Ağlasun","Altınyayla","Bucak","Çavdır","Çeltikçi","Gölhisar","Karamanlı","Kemer","Merkez","Tefenni","Yeşilova"],
+            "Bursa": ["Büyükorhan","Gemlik","Gürsu","Harmancık","İnegöl","İznik","Karacabey","Keles","Kestel","Mudanya","Mustafakemalpaşa","Nilüfer","Orhaneli","Orhangazi","Osmangazi","Yenişehir","Yıldırım"],
+            "Çanakkale": ["Ayvacık","Bayramiç","Biga","Bozcaada","Çan","Eceabat","Ezine","Gelibolu","Gökçeada","Lapseki","Merkez","Yenice"],
+            "Çankırı": ["Atkaracalar","Bayramören","Çerkeş","Eldivan","Ilgaz","Kızılırmak","Korgun","Kurşunlu","Merkez","Orta","Şabanözü","Yapraklı"],
+            "Çorum": ["Alaca","Bayat","Boğazkale","Dodurga","İskilip","Kargı","Laçin","Mecitözü","Merkez","Oğuzlar","Ortaköy","Osmancık","Sungurlu","Uğurludağ"],
+            "Denizli": ["Acıpayam","Babadağ","Baklan","Bekilli","Beyağaç","Bozkurt","Buldan","Çal","Çameli","Çardak","Çivril","Güney","Honaz","Kale","Merkezefendi","Pamukkale","Sarayköy","Serinhisar","Tavas"],
+            "Diyarbakır": ["Bağlar","Bismil","Çermik","Çınar","Çüngüş","Dicle","Eğil","Ergani","Hani","Hazro","Kayapınar","Kocaköy","Kulp","Lice","Silvan","Sur","Yenişehir"],
+            "Düzce": ["Akçakoca","Cumayeri","Çilimli","Gölyaka","Gümüşova","Kaynaşlı","Merkez","Yığılca"],
+            "Edirne": ["Enez","Havsa","İpsala","Keşan","Lalapaşa","Meriç","Merkez","Süloğlu","Uzunköprü"],
+            "Elazığ": ["Ağın","Alacakaya","Arıcak","Baskil","Karakoçan","Keban","Kovancılar","Maden","Merkez","Palu","Sivrice"],
+            "Erzincan": ["Çayırlı","İliç","Kemah","Kemaliye","Merkez","Otlukbeli","Refahiye","Tercan","Üzümlü"],
+            "Erzurum": ["Aşkale","Aziziye","Çat","Hınıs","Horasan","İspir","Karaçoban","Karayazı","Köprüköy","Narman","Oltu","Olur","Palandöken","Pasinler","Pazaryolu","Şenkaya","Tekman","Tortum","Uzundere","Yakutiye"],
+            "Eskişehir": ["Alpu","Beylikova","Çifteler","Günyüzü","Han","İnönü","Mahmudiye","Mihalgazi","Mihalıççık","Odunpazarı","Sarıcakaya","Seyitgazi","Sivrihisar","Tepebaşı"],
+            "Gaziantep": ["Araban","İslahiye","Karkamış","Nizip","Nurdağı","Oğuzeli","Şahinbey","Şehitkamil","Yavuzeli"],
+            "Giresun": ["Alucra","Bulancak","Çamoluk","Çanakçı","Dereli","Doğankent","Espiye","Eynesil","Görele","Güce","Keşap","Merkez","Piraziz","Şebinkarahisar","Tirebolu","Yağlıdere"],
+            "Gümüşhane": ["Kelkit","Köse","Kürtün","Merkez","Şiran","Torul"],
+            "Hakkari": ["Çukurca","Derecik","Merkez","Şemdinli","Yüksekova"],
+            "Hatay": ["Altınözü","Antakya","Arsuz","Belen","Defne","Dörtyol","Erzin","Hassa","İskenderun","Kırıkhan","Kumlu","Payas","Reyhanlı","Samandağ","Yayladağı"],
+            "Iğdır": ["Aralık","Karakoyunlu","Merkez","Tuzluca"],
+            "Isparta": ["Aksu","Atabey","Eğirdir","Gelendost","Gönen","Keçiborlu","Merkez","Senirkent","Sütçüler","Şarkikaraağaç","Uluborlu","Yalvaç","Yenişarbademli"],
+            "İstanbul": ["Adalar","Arnavutköy","Ataşehir","Avcılar","Bağcılar","Bahçelievler","Bakırköy","Başakşehir","Bayrampaşa","Beşiktaş","Beykoz","Beylikdüzü","Beyoğlu","Büyükçekmece","Çatalca","Çekmeköy","Esenler","Esenyurt","Eyüpsultan","Fatih","Gaziosmanpaşa","Güngören","Kadıköy","Kağıthane","Kartal","Küçükçekmece","Maltepe","Pendik","Sancaktepe","Sarıyer","Silivri","Sultanbeyli","Sultangazi","Şile","Şişli","Tuzla","Ümraniye","Üsküdar","Zeytinburnu"],
+            "İzmir": ["Aliağa","Balçova","Bayındır","Bayraklı","Bergama","Beydağ","Bornova","Buca","Çeşme","Çiğli","Dikili","Foça","Gaziemir","Güzelbahçe","Karabağlar","Karaburun","Karşıyaka","Kemalpaşa","Kınık","Kiraz","Konak","Menderes","Menemen","Narlıdere","Ödemiş","Seferihisar","Selçuk","Tire","Torbalı","Urla"],
+            "Kahramanmaraş": ["Afşin","Andırın","Çağlayancerit","Dulkadiroğlu","Ekinözü","Elbistan","Göksun","Nurhak","Onikişubat","Pazarcık","Türkoğlu"],
+            "Karabük": ["Eflani","Eskipazar","Merkez","Ovacık","Safranbolu","Yenice"],
+            "Karaman": ["Ayrancı","Başyayla","Ermenek","Kazımkarabekir","Merkez","Sarıveliler"],
+            "Kars": ["Akyaka","Arpaçay","Digor","Kağızman","Merkez","Sarıkamış","Selim","Susuz"],
+            "Kastamonu": ["Abana","Ağlı","Araç","Azdavay","Bozkurt","Cide","Çatalzeytin","Daday","Devrekani","Doğanyurt","Hanönü","İhsangazi","İnebolu","Küre","Merkez","Pınarbaşı","Seydiler","Şenpazar","Taşköprü","Tosya"],
+            "Kayseri": ["Akkışla","Bünyan","Develi","Felahiye","Hacılar","İncesu","Kocasinan","Melikgazi","Özvatan","Pınarbaşı","Sarıoğlan","Sarız","Talas","Tomarza","Yahyalı","Yeşilhisar"],
+            "Kırıkkale": ["Bahşılı","Balışeyh","Çelebi","Delice","Karakeçili","Keskin","Merkez","Sulakyurt","Yahşihan"],
+            "Kırklareli": ["Babaeski","Demirköy","Kofçaz","Lüleburgaz","Merkez","Pehlivanköy","Pınarhisar","Vize"],
+            "Kırşehir": ["Akçakent","Akpınar","Boztepe","Çiçekdağı","Kaman","Merkez","Mucur"],
+            "Kilis": ["Elbeyli","Merkez","Musabeyli","Polateli"],
+            "Kocaeli": ["Başiskele","Çayırova","Darıca","Derince","Dilovası","Gebze","Gölcük","İzmit","Kandıra","Karamürsel","Kartepe","Körfez"],
+            "Konya": ["Ahırlı","Akören","Akşehir","Altınekin","Beyşehir","Bozkır","Cihanbeyli","Çeltik","Çumra","Derbent","Derebucak","Doğanhisar","Emirgazi","Ereğli","Güneysınır","Hadim","Halkapınar","Hüyük","Ilgın","Kadınhanı","Karapınar","Karatay","Kulu","Meram","Sarayönü","Selçuklu","Seydişehir","Taşkent","Tuzlukçu","Yalıhüyük","Yunak"],
+            "Kütahya": ["Altıntaş","Aslanapa","Çavdarhisar","Domaniç","Dumlupınar","Emet","Gediz","Hisarcık","Merkez","Pazarlar","Simav","Şaphane","Tavşanlı"],
+            "Malatya": ["Akçadağ","Arapgir","Arguvan","Battalgazi","Darende","Doğanşehir","Doğanyol","Hekimhan","Kale","Kuluncak","Pütürge","Yazıhan","Yeşilyurt"],
+            "Manisa": ["Ahmetli","Akhisar","Alaşehir","Demirci","Gölmarmara","Gördes","Kırkağaç","Köprübaşı","Kula","Salihli","Sarıgöl","Saruhanlı","Selendi","Soma","Şehzadeler","Turgutlu","Yunusemre"],
+            "Mardin": ["Artuklu","Dargeçit","Derik","Kızıltepe","Mazıdağı","Midyat","Nusaybin","Ömerli","Savur","Yeşilli"],
+            "Mersin": ["Akdeniz","Anamur","Aydıncık","Bozyazı","Çamlıyayla","Erdemli","Gülnar","Mezitli","Mut","Silifke","Tarsus","Toroslar","Yenişehir"],
+            "Muğla": ["Bodrum","Dalaman","Datça","Fethiye","Kavaklıdere","Köyceğiz","Marmaris","Menteşe","Milas","Ortaca","Seydikemer","Ula","Yatağan"],
+            "Muş": ["Bulanık","Hasköy","Korkut","Malazgirt","Merkez","Varto"],
+            "Nevşehir": ["Acıgöl","Avanos","Derinkuyu","Gülşehir","Hacıbektaş","Kozaklı","Merkez","Ürgüp"],
+            "Niğde": ["Altunhisar","Bor","Çamardı","Çiftlik","Merkez","Ulukışla"],
+            "Ordu": ["Akkuş","Altınordu","Aybastı","Çamaş","Çatalpınar","Çaybaşı","Fatsa","Gölköy","Gülyalı","Gürgentepe","İkizce","Kabadüz","Kabataş","Korgan","Kumru","Mesudiye","Perşembe","Ulubey","Ünye"],
+            "Osmaniye": ["Bahçe","Düziçi","Hasanbeyli","Kadirli","Merkez","Sumbas","Toprakkale"],
+            "Rize": ["Ardeşen","Çamlıhemşin","Çayeli","Derepazarı","Fındıklı","Güneysu","Hemşin","İkizdere","İyidere","Kalkandere","Merkez","Pazar"],
+            "Sakarya": ["Adapazarı","Akyazı","Arifiye","Erenler","Ferizli","Geyve","Hendek","Karapürçek","Karasu","Kaynarca","Kocaali","Pamukova","Sapanca","Serdivan","Söğütlü","Taraklı"],
+            "Samsun": ["19 Mayıs","Alaçam","Asarcık","Atakum","Ayvacık","Bafra","Canik","Çarşamba","Havza","İlkadım","Kavak","Ladik","Salıpazarı","Tekkeköy","Terme","Vezirköprü","Yakakent"],
+            "Siirt": ["Baykan","Eruh","Kurtalan","Merkez","Pervari","Şirvan","Tillo"],
+            "Sinop": ["Ayancık","Boyabat","Dikmen","Durağan","Erfelek","Gerze","Merkez","Saraydüzü","Türkeli"],
+            "Sivas": ["Akıncılar","Altınyayla","Divriği","Doğanşar","Gemerek","Gölova","Gürün","Hafik","İmranlı","Kangal","Koyulhisar","Merkez","Suşehri","Şarkışla","Ulaş","Yıldızeli","Zara"],
+            "Şanlıurfa": ["Akçakale","Birecik","Bozova","Ceylanpınar","Eyyübiye","Halfeti","Haliliye","Harran","Hilvan","Karaköprü","Siverek","Suruç","Viranşehir"],
+            "Şırnak": ["Beytüşşebap","Cizre","Güçlükonak","İdil","Merkez","Silopi","Uludere"],
+            "Tekirdağ": ["Çerkezköy","Çorlu","Ergene","Hayrabolu","Kapaklı","Malkara","Marmaraereğlisi","Muratlı","Saray","Süleymanpaşa","Şarköy"],
+            "Tokat": ["Almus","Artova","Başçiftlik","Erbaa","Merkez","Niksar","Pazar","Reşadiye","Sulusaray","Turhal","Yeşilyurt","Zile"],
+            "Trabzon": ["Akçaabat","Araklı","Arsin","Beşikdüzü","Çarşıbaşı","Çaykara","Dernekpazarı","Düzköy","Hayrat","Köprübaşı","Maçka","Of","Ortahisar","Sürmene","Şalpazarı","Tonya","Vakfıkebir","Yomra"],
+            "Tunceli": ["Çemişgezek","Hozat","Mazgirt","Merkez","Nazımiye","Ovacık","Pertek","Pülümür"],
+            "Uşak": ["Banaz","Eşme","Karahallı","Merkez","Sivaslı","Ulubey"],
+            "Van": ["Bahçesaray","Başkale","Çaldıran","Çatak","Edremit","Erciş","Gevaş","Gürpınar","İpekyolu","Muradiye","Özalp","Saray","Tuşba"],
+            "Yalova": ["Altınova","Armutlu","Çınarcık","Çiftlikköy","Merkez","Termal"],
+            "Yozgat": ["Akdağmadeni","Aydıncık","Boğazlıyan","Çandır","Çayıralan","Çekerek","Kadışehri","Merkez","Saraykent","Sarıkaya","Sorgun","Şefaatli","Yenifakılı","Yerköy"],
+            "Zonguldak": ["Alaplı","Çaycuma","Devrek","Ereğli","Gökçebey","Kilimli","kozlu","Merkez"]
+        };
+        
+        const COLLECTION_NAME = 'maas_verileri_tr'; 
+        const CONFIG_DOC = 'maas_config/global_tr';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAqeO-yQyQPnLsOqKmSNvVH23WPvneIjaU",
+            authDomain: "shaped-totem-481514-c5.firebaseapp.com",
+            projectId: "shaped-totem-481514-c5",
+            storageBucket: "shaped-totem-481514-c5.firebasestorage.app",
+            messagingSenderId: "519295049418",
+            appId: "1:519295049418:web:7d04e18c4ea36bc088de33",
+            measurementId: "G-10ENZQDXK1"
+        };
+        
+        let db, auth, user;
+        let globalData = [];
+        let globalConfig = { news: "", popup: "", links: [] };
+        let chartInstances = {};
+        let isAdmin = false;
+
+        // --- BAŞLATMA ---
+        async function init() {
+            populateCitySelects();
+            populateRoleSelect();
+            
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                onAuthStateChanged(auth, (u) => {
+                    if(u) { 
+                        user = u; 
+                        startRealtimeListener(); 
+                        startConfigListener();
+                        
+                        if(!u.isAnonymous) {
+                            isAdmin = true;
+                            document.getElementById('admin-login-view').classList.add('hidden');
+                            document.getElementById('admin-controls-view').classList.remove('hidden');
+                            renderAdminList();
+                        }
+                    } else {
+                        signInAnonymously(auth);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Init error", error);
+                showConnectionError(error);
+            }
+        }
+
+        function showConnectionError(error) {
+            document.getElementById('app-loader').classList.remove('hidden');
+            document.querySelector('#app-loader h2').innerText = "Bağlantı Hatası";
+            document.querySelector('#app-loader p').innerText = "Veritabanına bağlanılamadı.";
+            document.getElementById('error-container').classList.remove('hidden');
+            document.getElementById('error-desc').innerText = error.message;
+        }
+
+        // --- VERİ & AYAR DİNLEME ---
+        function startRealtimeListener() {
+            const q = collection(db, COLLECTION_NAME);
+            onSnapshot(q, (snapshot) => {
+                globalData = [];
+                snapshot.forEach(doc => { globalData.push({ id: doc.id, ...doc.data() }); });
+                document.getElementById('app-loader').classList.add('hidden');
+                updateHeaderCount();
+                updateMiniFeed();
+                applyFilters();
+                if(isAdmin) renderAdminList(); 
+            }, (error) => { console.error(error); });
+        }
+
+        function startConfigListener() {
+            onSnapshot(doc(db, "maas_config", "global_tr"), (docSnap) => {
+                if (docSnap.exists()) {
+                    globalConfig = docSnap.data();
+                    applyConfig();
+                }
+            });
+        }
+
+        function applyConfig() {
+            // Haber Bandı
+            if(globalConfig.news) document.getElementById('marquee-text').innerText = globalConfig.news;
+            
+            // Linkler
+            const linkCont = document.getElementById('footer-links-container');
+            linkCont.innerHTML = '';
+            if(globalConfig.links && globalConfig.links.length > 0) {
+                globalConfig.links.forEach((link, index) => {
+                    let delBtn = isAdmin ? `<button onclick="window.deleteLink(${index})" class="ml-2 text-red-400 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>` : '';
+                    linkCont.innerHTML += `
+                        <a href="${link.url}" target="_blank" class="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-full text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 hover:shadow-md transition group">
+                            <span class="bg-white p-1 rounded-full text-indigo-500 group-hover:scale-110 transition"><i class="fa-solid fa-link"></i></span>
+                            <span>${link.title}</span>
+                            ${delBtn}
+                        </a>
+                    `;
+                });
+            } else {
+                linkCont.innerHTML = '<span class="text-[10px] text-slate-300">Henüz çalışma eklenmedi.</span>';
+            }
+
+            // Popup (Kullanıcı için)
+            if(globalConfig.popup && globalConfig.popup.trim() !== "") {
+                if(sessionStorage.getItem('last_popup_tr') !== globalConfig.popup) {
+                    document.getElementById('user-popup-content').innerText = globalConfig.popup;
+                    document.getElementById('user-announcement-modal').classList.remove('hidden');
+                    sessionStorage.setItem('last_popup_tr', globalConfig.popup);
+                }
+            }
+        }
+
+        // --- ŞEHİR / İLÇE YÖNETİMİ ---
+        function populateCitySelects() {
+            const entryCity = document.getElementById('entry-city');
+            const filterCity = document.getElementById('filter-city');
+            
+            const cities = Object.keys(TURKEY_DATA).sort();
+            
+            cities.forEach(city => {
+                const opt = `<option value="${city}">${city}</option>`;
+                entryCity.innerHTML += opt;
+                filterCity.innerHTML += opt;
+            });
+        }
+
+        window.updateDistricts = (type) => {
+            const citySelect = document.getElementById(`${type}-city`);
+            const districtSelect = document.getElementById(`${type}-district`);
+            const selectedCity = citySelect.value;
+            
+            districtSelect.innerHTML = type === 'filter' ? '<option value="all">Tüm İlçeler</option>' : '<option value="" disabled selected>İlçe Seç...</option>';
+            
+            if (selectedCity && selectedCity !== 'all' && TURKEY_DATA[selectedCity]) {
+                districtSelect.disabled = false;
+                TURKEY_DATA[selectedCity].sort().forEach(dist => {
+                    districtSelect.innerHTML += `<option value="${dist}">${dist}</option>`;
+                });
+            } else {
+                if (type === 'filter' && selectedCity === 'all') {
+                     districtSelect.innerHTML = '<option value="all">Önce İl Seçin</option>';
+                     districtSelect.disabled = true;
+                } else if (type === 'entry') {
+                    districtSelect.innerHTML = '<option value="" disabled selected>Önce İl Seçin</option>';
+                    districtSelect.disabled = true;
+                }
+            }
+        };
+
+        // --- FORM İŞLEMLERİ ---
+        window.handleFormSubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            
+            const year = document.getElementById('entry-year').value;
+            const salary = parseInt(document.getElementById('entry-salary').value);
+            const role = document.getElementById('entry-role').value;
+            const city = document.getElementById('entry-city').value;
+            const district = document.getElementById('entry-district').value;
+            const exp = parseFloat(document.getElementById('entry-exp').value);
+            const nick = document.getElementById('entry-nick').value || "Anonim";
+
+            if (!city || !district) { showToast("Lütfen İl ve İlçe seçiniz.", "error"); return; }
+            if(salary < MIN_WAGE[year]) { showToast(`${year} asgari ücreti (${MIN_WAGE[year]} TL) altı girilemez.`, "error"); return; }
+            
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Kaydediliyor...`;
+            btn.disabled = true;
+
+            try {
+                await addDoc(collection(db, COLLECTION_NAME), {
+                    year, salary, role, city, district, exp, nickname: nick,
+                    uid: user ? user.uid : 'anon',
+                    timestamp: serverTimestamp() 
+                });
+                showToast("Veri başarıyla eklendi!", "success");
+                document.getElementById('salaryForm').reset();
+                // Reset districts
+                document.getElementById('entry-district').innerHTML = '<option value="" disabled selected>Önce İl Seçin</option>';
+                document.getElementById('entry-district').disabled = true;
+                
+                switchTab('explore');
+                document.getElementById('filter-year').value = year;
+                applyFilters(); 
+            } catch (error) {
+                console.error(error);
+                showToast("Kayıt başarısız: " + error.message, "error");
+            } finally {
+                btn.innerHTML = `<span>Havuza Gönder</span><i class="fa-solid fa-paper-plane"></i>`;
+                btn.disabled = false;
+            }
+        };
+
+        document.getElementById('salaryForm').addEventListener('submit', window.handleFormSubmit);
+
+        // --- ADMIN FONKSİYONLARI ---
+        window.toggleAdminPanel = () => {
+            document.getElementById('admin-modal').classList.toggle('hidden');
+            if(document.getElementById('admin-modal').classList.contains('hidden') && !isAdmin) {
+                 document.getElementById('admin-login-view').classList.remove('hidden');
+                 document.getElementById('admin-controls-view').classList.add('hidden');
+            }
+        };
+        
+        window.adminLogin = () => {
+            const email = document.getElementById('admin-email').value;
+            const pass = document.getElementById('admin-pass').value;
+            const msg = document.getElementById('admin-msg');
+
+            msg.classList.add('hidden');
+
+            signInWithEmailAndPassword(auth, email, pass)
+                .then((userCredential) => {
+                    isAdmin = true;
+                    document.getElementById('admin-login-view').classList.add('hidden');
+                    document.getElementById('admin-controls-view').classList.remove('hidden');
+                    showToast("Yönetici girişi başarılı", "success");
+                    
+                    document.getElementById('admin-input-news').value = globalConfig.news || "";
+                    document.getElementById('admin-input-popup').value = globalConfig.popup || "";
+                    
+                    renderAdminList();
+                    applyConfig(); 
+                })
+                .catch((error) => {
+                    console.error(error);
+                    msg.innerText = "Hatalı e-posta veya şifre!";
+                    msg.classList.remove('hidden');
+                });
+        };
+
+        window.logoutAdmin = () => {
+            signOut(auth).then(() => {
+                isAdmin = false;
+                document.getElementById('admin-login-view').classList.remove('hidden');
+                document.getElementById('admin-controls-view').classList.add('hidden');
+                document.getElementById('admin-pass').value = '';
+                showToast("Çıkış yapıldı");
+                applyConfig();
+                signInAnonymously(auth);
+            });
+        };
+
+        window.saveConfig = async (type) => {
+            if(!isAdmin) return;
+            const val = document.getElementById(`admin-input-${type}`).value;
+            const updateData = {};
+            updateData[type] = val;
+            
+            try {
+                await setDoc(doc(db, "maas_config", "global_tr"), updateData, { merge: true });
+                showToast("Ayar güncellendi!", "success");
+            } catch(e) { showToast("Hata: " + e.message, "error"); }
+        };
+
+        window.addFooterLink = async () => {
+            if(!isAdmin) return;
+            const t = document.getElementById('admin-link-title').value;
+            const u = document.getElementById('admin-link-url').value;
+            if(!t || !u) { showToast("Başlık ve URL gerekli", "error"); return; }
+
+            const newLinks = [...(globalConfig.links || []), {title: t, url: u}];
+            try {
+                await setDoc(doc(db, "maas_config", "global_tr"), { links: newLinks }, { merge: true });
+                showToast("Link eklendi", "success");
+                document.getElementById('admin-link-title').value='';
+                document.getElementById('admin-link-url').value='';
+            } catch(e) { showToast("Hata: " + e.message, "error"); }
+        };
+
+        window.deleteLink = async (index) => {
+            if(!isAdmin) return;
+            if(!confirm("Bu linki kaldırmak istediğine emin misin?")) return;
+            const newLinks = globalConfig.links.filter((_, i) => i !== index);
+            try {
+                await setDoc(doc(db, "maas_config", "global_tr"), { links: newLinks }, { merge: true });
+                showToast("Link silindi", "success");
+            } catch(e) { showToast("Hata: " + e.message, "error"); }
+        };
+
+        window.deleteRecord = async (id) => {
+            if(!isAdmin) return;
+            if(!confirm("Silmek istediğine emin misin?")) return;
+            try {
+                await deleteDoc(doc(db, COLLECTION_NAME, id));
+                showToast("Kayıt silindi", "success");
+            } catch(e) { showToast("Hata: " + e.message, "error"); }
+        };
+
+        function renderAdminList() {
+            const list = document.getElementById('admin-records-list');
+            document.getElementById('admin-record-count').innerText = globalData.length;
+            list.innerHTML = '';
+            
+            const sorted = [...globalData].sort((a,b) => {
+                const ta = a.timestamp ? (a.timestamp.seconds || 0) : 0;
+                const tb = b.timestamp ? (b.timestamp.seconds || 0) : 0;
+                return tb - ta;
+            });
+
+            sorted.forEach(d => {
+                list.innerHTML += `
+                    <div class="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition">
+                        <div>
+                            <p class="text-xs font-bold text-slate-800">${d.nickname} (${d.city})</p>
+                            <p class="text-[10px] text-slate-500">${d.role} | ${formatMoney(d.salary)}</p>
+                        </div>
+                        <button onclick="window.deleteRecord('${d.id}')" class="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        // --- DASHBOARD ---
+        window.applyFilters = () => {
+            const fYear = document.getElementById('filter-year').value;
+            const fRole = document.getElementById('filter-role').value;
+            const fCity = document.getElementById('filter-city').value;
+            const fDist = document.getElementById('filter-district').value;
+            
+            let filtered = globalData;
+            
+            filtered = filtered.map(d => {
+                let time = 0;
+                if (d.timestamp && d.timestamp.toMillis) time = d.timestamp.toMillis();
+                else if (typeof d.timestamp === 'number') time = d.timestamp;
+                return { ...d, sortTime: time };
+            });
+
+            if(fYear !== 'all') filtered = filtered.filter(d => d.year == fYear);
+            if(fRole !== 'all') filtered = filtered.filter(d => d.role == fRole);
+            if(fCity !== 'all') filtered = filtered.filter(d => d.city == fCity);
+            if(fDist && fDist !== 'all') filtered = filtered.filter(d => d.district == fDist);
+            
+            renderStats(filtered);
+            renderCharts(filtered);
+            renderTable(filtered);
+        };
+
+        function renderStats(data) {
+            document.getElementById('stat-count').innerText = data.length;
+            if(data.length === 0) { ['avg', 'min', 'max'].forEach(k => document.getElementById('stat-'+k).innerText = "0 ₺"); return; }
+            const s = data.map(d => d.salary);
+            const sum = s.reduce((a,b) => a+b, 0);
+            document.getElementById('stat-avg').innerText = formatMoney(Math.round(sum / data.length));
+            document.getElementById('stat-min').innerText = formatMoney(Math.min(...s));
+            document.getElementById('stat-max').innerText = formatMoney(Math.max(...s));
+        }
+
+        function renderCharts(data) {
+            if(data.length === 0) {
+                if(chartInstances.exp) chartInstances.exp.destroy();
+                if(chartInstances.dist) chartInstances.dist.destroy();
+                return;
+            }
+            // Tecrübe Grafiği
+            const eG = {}; data.forEach(d => { if(!eG[d.exp]) eG[d.exp]={s:0,c:0}; eG[d.exp].s+=d.salary; eG[d.exp].c++; });
+            const eL = Object.keys(eG).sort((a,b)=>parseFloat(a)-parseFloat(b));
+            updateChart('chartExp', 'line', eL.map(v=>v==0.5?"0-6 Ay":(v==10?"10+ Yıl":v+" Yıl")), eL.map(k=>Math.round(eG[k].s/eG[k].c)), 'Ortalama Maaş', '#3b82f6');
+            
+            // İlçe Grafiği (Şehir - İlçe olarak grupla ki karışmasın "Merkez" gibi)
+            const dG = {}; 
+            data.forEach(d => { 
+                const key = `${d.city} - ${d.district}`; 
+                if(!dG[key]) dG[key]={s:0,c:0}; 
+                dG[key].s+=d.salary; 
+                dG[key].c++; 
+            });
+            const sorted = Object.keys(dG).map(k=>({n:k,a:Math.round(dG[k].s/dG[k].c)})).sort((a,b)=>b.a-a.a).slice(0,5);
+            updateChart('chartDistrict', 'bar', sorted.map(x=>x.n), sorted.map(x=>x.a), 'Ortalama Maaş', '#10b981');
+        }
+
+        function updateChart(cid, type, labels, data, label, color) {
+            const ctx = document.getElementById(cid).getContext('2d');
+            if(cid === 'chartExp' && chartInstances.exp) chartInstances.exp.destroy();
+            if(cid === 'chartDistrict' && chartInstances.dist) chartInstances.dist.destroy();
+            const nc = new Chart(ctx, { type, data: { labels, datasets: [{ label, data, backgroundColor: color, borderColor: color, tension: 0.3, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+            if(cid === 'chartExp') chartInstances.exp = nc;
+            if(cid === 'chartDistrict') chartInstances.dist = nc;
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            [...data].sort((a,b)=> b.sortTime - a.sortTime).slice(0,100).forEach(d => {
+                // Konum sütunu: Şehir varsa Şehir / İlçe, yoksa sadece ilçe (eski veri uyumu için)
+                const locationStr = d.city ? `${d.city} / ${d.district}` : d.district;
+                
+                tbody.innerHTML += `<tr class="hover:bg-slate-50 border-b border-slate-50"><td class="px-4 py-3 font-medium">${d.nickname}</td><td class="px-4 py-3">${d.role}</td><td class="px-4 py-3 text-slate-500 text-xs">${locationStr}</td><td class="px-4 py-3 text-xs font-bold text-slate-400">${d.exp==0.5?"0-6 Ay":d.exp+" Yıl"}</td><td class="px-4 py-3 text-right font-bold text-blue-600">${formatMoney(d.salary)}</td></tr>`;
+            });
+        }
+
+        // --- YARDIMCI FONKSİYONLAR ---
+        window.switchTab = (t) => {
+            document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-'+t).classList.add('active');
+            const b1 = document.getElementById('tab-btn-entry'), b2 = document.getElementById('tab-btn-explore');
+            const act = "flex-1 py-2.5 text-sm font-bold rounded-lg transition-all text-white bg-blue-600 shadow-sm flex items-center justify-center gap-2";
+            const pas = "flex-1 py-2.5 text-sm font-bold rounded-lg transition-all text-slate-500 hover:bg-slate-50 flex items-center justify-center gap-2";
+            b1.className = t==='entry'?act:pas; b2.className = t==='explore'?act:pas;
+            if(t==='explore') applyFilters();
+        };
+
+        function updateHeaderCount() { document.getElementById('header-total-count').innerText = globalData.length; }
+        function updateMiniFeed() {
+            const f = document.getElementById('mini-feed'); f.innerHTML = '';
+            [...globalData].sort((a,b)=> (b.sortTime||0) - (a.sortTime||0)).slice(0,3).forEach(d => {
+                const loc = d.city ? `${d.city}, ${d.district}` : d.district;
+                f.innerHTML += `<div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs"><div><span class="font-bold text-slate-700">${d.role}</span><br><span class="text-slate-500 text-[10px]"><i class="fa-solid fa-location-dot"></i> ${loc}</span></div><span class="font-bold text-blue-600">${formatMoney(d.salary)}</span></div>`;
+            });
+            if(globalData.length===0) f.innerHTML = '<p class="text-xs text-slate-400 italic pl-1">Henüz veri yok.</p>';
+        }
+
+        function formatMoney(n) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n); }
+        window.showToast = (msg, type='info') => Toastify({ text: msg, duration: 3000, gravity: "top", position: "center", backgroundColor: type==='error'?"#ef4444":(type==='success'?"#10b981":"#3b82f6"), className: "rounded-lg font-bold text-sm shadow-xl" }).showToast();
+        window.resetFilters = () => { 
+            document.getElementById('filter-year').value='2025'; 
+            document.getElementById('filter-role').value='all'; 
+            document.getElementById('filter-city').value='all';
+            updateDistricts('filter');
+            applyFilters(); 
+        };
+        
+        function populateRoleSelect() {
+            const fR = document.getElementById('filter-role');
+            document.getElementById('entry-role').querySelectorAll('optgroup').forEach(g => {
+                const nG = document.createElement('optgroup'); nG.label = g.label;
+                g.querySelectorAll('option').forEach(op => { const nO = document.createElement('option'); nO.value=op.value; nO.innerText=op.innerText; nG.appendChild(nO); });
+                fR.appendChild(nG);
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
