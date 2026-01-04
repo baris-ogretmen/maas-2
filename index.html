@@ -331,7 +331,7 @@
                     <div class="overflow-y-auto pr-2 space-y-4 custom-scroll">
                         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                             <h4 class="font-bold text-blue-700 text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-comment-dots"></i> Pop-up Duyuru</h4>
-                            <textarea id="admin-input-popup" class="w-full p-3 rounded-lg border border-slate-300 text-xs mb-2 outline-none" rows="2" placeholder="Sisteme giren herkese görünecek mesaj..."></textarea>
+                            <textarea id="admin-input-popup" class="w-full p-3 rounded-lg border border-slate-300 text-xs mb-2 outline-none" rows="2" placeholder="Duyuru metni... Link yazarsan otomatik tıklanabilir olur."></textarea>
                             <button onclick="saveConfig('popup')" class="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">Yayınla</button>
                         </div>
 
@@ -369,7 +369,7 @@
             <button onclick="document.getElementById('user-announcement-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
             <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-6 animate-bounce"><i class="fa-solid fa-bell"></i></div>
             <h3 class="text-xl font-black text-slate-800 mb-3">DUYURU</h3>
-            <p id="user-popup-content" class="text-slate-600 mb-8 font-medium text-sm leading-relaxed">...</p>
+            <p id="user-popup-content" class="text-slate-600 mb-8 font-medium text-sm leading-relaxed whitespace-pre-line">...</p>
             <button onclick="document.getElementById('user-announcement-modal').classList.add('hidden')" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-200">Tamam, Okudum</button>
         </div>
     </div>
@@ -572,10 +572,14 @@
                 linkCont.innerHTML = '<span class="text-[10px] text-slate-300">Henüz çalışma eklenmedi.</span>';
             }
 
-            // Popup (Kullanıcı için)
+            // Popup (Kullanıcı için) - GÜNCELLENEN KISIM BURASI
             if(globalConfig.popup && globalConfig.popup.trim() !== "") {
                 if(sessionStorage.getItem('last_popup_tr') !== globalConfig.popup) {
-                    document.getElementById('user-popup-content').innerText = globalConfig.popup;
+                    const popupText = globalConfig.popup;
+                    // Regex ile linkleri bul ve <a> etiketi içine al
+                    const linkedText = popupText.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-blue-600 underline font-bold hover:text-blue-800">$1</a>');
+                    
+                    document.getElementById('user-popup-content').innerHTML = linkedText;
                     document.getElementById('user-announcement-modal').classList.remove('hidden');
                     sessionStorage.setItem('last_popup_tr', globalConfig.popup);
                 }
@@ -831,7 +835,7 @@
             const eL = Object.keys(eG).sort((a,b)=>parseFloat(a)-parseFloat(b));
             updateChart('chartExp', 'line', eL.map(v=>v==0.5?"0-6 Ay":(v==10?"10+ Yıl":v+" Yıl")), eL.map(k=>Math.round(eG[k].s/eG[k].c)), 'Ortalama Maaş', '#3b82f6');
             
-            // İlçe Grafiği (Şehir - İlçe olarak grupla ki karışmasın "Merkez" gibi)
+            // İlçe Grafiği
             const dG = {}; 
             data.forEach(d => { 
                 const key = `${d.city} - ${d.district}`; 
@@ -856,9 +860,7 @@
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
             [...data].sort((a,b)=> b.sortTime - a.sortTime).slice(0,100).forEach(d => {
-                // Konum sütunu: Şehir varsa Şehir / İlçe, yoksa sadece ilçe (eski veri uyumu için)
                 const locationStr = d.city ? `${d.city} / ${d.district}` : d.district;
-                
                 tbody.innerHTML += `<tr class="hover:bg-slate-50 border-b border-slate-50"><td class="px-4 py-3 font-medium">${d.nickname}</td><td class="px-4 py-3">${d.role}</td><td class="px-4 py-3 text-slate-500 text-xs">${locationStr}</td><td class="px-4 py-3 text-xs font-bold text-slate-400">${d.exp==0.5?"0-6 Ay":d.exp+" Yıl"}</td><td class="px-4 py-3 text-right font-bold text-blue-600">${formatMoney(d.salary)}</td></tr>`;
             });
         }
